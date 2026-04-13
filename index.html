@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">Raíces Burger - Menú Digital</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* ── VARIABLES MODO OSCURO (default) ── */
+        :root, [data-theme="dark"] {
+            --primary: #f28b24;
+            --primary-dark: #cc741c;
+            --bg: #0d0d0d;
+            --bg2: #111;
+            --card: #1a1a1a;
+            --border: #2a2a2a;
+            --text: #fff;
+            --text2: #ccc;
+            --muted: #888;
+            --font-h: 'Oswald', sans-serif;
+            --font-b: 'Poppins', sans-serif;
+        }
+
+        /* ── VARIABLES MODO CLARO ── */
+        [data-theme="light"] {
+            --bg: #f5f5f5;
+            --bg2: #ffffff;
+            --card: #ffffff;
+            --border: #e0e0e0;
+            --text: #111;
+            --text2: #333;
+            --muted: #666;
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; transition: background 0.3s, color 0.2s, border-color 0.2s; }
+        body { background:var(--bg); color:var(--text); font-family:var(--font-b); }
+
+        /* ── TOPBAR ── */
+        .topbar {
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            padding: 0.7rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            gap: 0.5rem;
+        }
+        .topbar-logo { display:flex; align-items:center; gap:0.8rem; }
+        .topbar-logo img { height:40px; width:auto; border-radius:6px; }
+        .topbar-brand-name { font-family:var(--font-h); font-size:1.3rem; color:var(--primary); letter-spacing:1px; }
+        .topbar-right { display:flex; align-items:center; gap:0.8rem; }
+
+        /* Estado abierto/cerrado */
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.75rem;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+        .status-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .status-dot.open { background: #25D366; }
+        .status-dot.closed { background: #e74c3c; animation: none; }
+
+        @keyframes pulse {
+            0%,100% { opacity:1; transform:scale(1); }
+            50% { opacity:0.5; transform:scale(1.3); }
+        }
+
+        /* Toggle modo claro/oscuro */
+        .theme-toggle {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 0.35rem 0.7rem;
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            color: var(--muted);
+            transition: all 0.2s;
+        }
+        .theme-toggle:hover { border-color: var(--primary); color: var(--primary); }
+
+        /* ── BANNER CERRADO ── */
+        .closed-banner {
+            display: none;
+            background: #1a0a0a;
+            border-bottom: 2px solid #e74c3c;
+            padding: 1rem 1.5rem;
+            text-align: center;
+        }
+        .closed-banner.show { display: block; }
+        .closed-banner h3 { font-family: var(--font-h); color: #e74c3c; font-size: 1.2rem; margin-bottom: 0.3rem; }
+        .closed-banner p { color: var(--muted); font-size: 0.85rem; }
+
+        /* ── SLIDER ── */
+        .slider { position:relative; width:100%; height:280px; overflow:hidden; background:#111; }
+        @media (min-width:768px) { .slider { height:420px; } }
+        .slide { position:absolute; inset:0; opacity:0; transition:opacity 0.8s ease; }
+        .slide.active { opacity:1; }
+        .slide img { width:100%; height:100%; object-fit:cover; }
+        .slide-overlay { position:absolute; inset:0; background:linear-gradient(to right, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 60%, transparent 100%); }
+        .slide-content { position:absolute; bottom:2rem; left:1.5rem; right:1.5rem; }
+        .slide-tag { display:inline-block; background:var(--primary); color:white; font-family:var(--font-h); font-size:0.75rem; letter-spacing:1.5px; padding:0.25rem 0.8rem; border-radius:20px; margin-bottom:0.5rem; text-transform:uppercase; }
+        .slide-title { font-family:var(--font-h); font-size:2rem; font-weight:700; line-height:1.1; text-shadow:0 2px 10px rgba(0,0,0,0.8); color:white; }
+        @media (min-width:768px) { .slide-title { font-size:3rem; } }
+        .slide-price { font-family:var(--font-h); font-size:1.3rem; color:var(--primary); margin-top:0.3rem; }
+        .slider-dots { position:absolute; bottom:1rem; right:1.5rem; display:flex; gap:0.4rem; }
+        .dot { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.3); cursor:pointer; transition:all 0.3s; }
+        .dot.active { background:var(--primary); transform:scale(1.3); }
+
+        /* ── CATEGORÍAS NAV ── */
+        .cat-nav {
+            position:sticky; top:57px; z-index:150;
+            background:var(--bg2); border-bottom:1px solid var(--border);
+            display:flex; overflow-x:auto; scrollbar-width:none; padding:0 0.5rem; gap:0;
+        }
+        .cat-nav::-webkit-scrollbar { display:none; }
+        .cat-btn {
+            flex-shrink:0; background:transparent; border:none; color:var(--muted);
+            font-family:var(--font-h); font-size:0.95rem; padding:1rem 1.3rem;
+            cursor:pointer; border-bottom:3px solid transparent; transition:all 0.2s;
+            display:flex; align-items:center; gap:0.4rem; white-space:nowrap; letter-spacing:0.5px;
+        }
+        .cat-btn:hover { color:var(--text); }
+        .cat-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+        .cat-btn .cat-icon { font-size:1.2rem; }
+
+        /* ── SECCIONES ── */
+        .cat-section { scroll-margin-top:110px; }
+        .section-header { padding:2rem 1.5rem 1rem; display:flex; align-items:center; gap:0.8rem; border-bottom:1px solid var(--border); }
+        .section-header-icon { font-size:2rem; background:var(--card); border:1px solid var(--border); width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; }
+        .section-header-text h2 { font-family:var(--font-h); font-size:1.5rem; color:var(--text); }
+        .section-header-text p { color:var(--muted); font-size:0.8rem; margin-top:2px; }
+
+        /* ── GRID ── */
+        .products-section-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1.5rem; padding:1.5rem; }
+
+        /* ── CARD PREMIUM ── */
+        .product-card-premium {
+            background:var(--card); border:1px solid var(--border); border-radius:16px;
+            overflow:hidden; transition:transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s;
+        }
+        .product-card-premium:hover { transform:translateY(-6px); box-shadow:0 12px 30px rgba(242,139,36,0.15); border-color:rgba(242,139,36,0.3); }
+        .product-card-premium.featured { border-color:var(--primary); box-shadow:0 0 0 1px var(--primary); }
+        .product-card-premium.agotado { opacity:0.6; }
+
+        .card-img-wrap { position:relative; height:200px; overflow:hidden; }
+        .card-img-wrap img { width:100%; height:100%; object-fit:cover; transition:transform 0.5s ease; }
+        .product-card-premium:hover .card-img-wrap img { transform:scale(1.06); }
+        .card-badge { position:absolute; top:12px; right:12px; background:var(--primary); color:white; font-family:var(--font-h); font-size:0.7rem; letter-spacing:1px; padding:0.25rem 0.7rem; border-radius:20px; text-transform:uppercase; }
+        .card-badge.agotado-badge { background:#e74c3c; }
+
+        /* Overlay agotado */
+        .agotado-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; }
+        .agotado-overlay span { font-family:var(--font-h); color:white; font-size:1.2rem; background:#e74c3c; padding:0.5rem 1.2rem; border-radius:8px; letter-spacing:1px; }
+
+        .card-body { padding:1.2rem; }
+        .card-name { font-family:var(--font-h); font-size:1.2rem; color:var(--text); margin-bottom:0.4rem; }
+        .card-desc { font-size:0.82rem; color:var(--muted); line-height:1.5; margin-bottom:0.3rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .card-desc.expanded { display:block; }
+        .btn-ver-mas { background:none; border:none; color:var(--primary); font-size:0.78rem; cursor:pointer; padding:0 0 0.8rem 0; font-family:var(--font-b); display:block; }
+        .card-footer { display:flex; align-items:center; justify-content:space-between; }
+        .card-price { font-family:var(--font-h); font-size:1.3rem; color:var(--primary); }
+        .btn-agregar { background:var(--primary); color:white; border:none; border-radius:10px; padding:0.55rem 1.1rem; font-family:var(--font-h); font-size:1rem; cursor:pointer; transition:background 0.2s, transform 0.1s; }
+        .btn-agregar:hover { background:var(--primary-dark); }
+        .btn-agregar:active { transform:scale(0.95); }
+        .btn-agregar:disabled { background:#444; cursor:not-allowed; }
+
+        /* ── FOOTER ── */
+        .footer { background:var(--bg2); border-top:1px solid var(--border); padding:3rem 1.5rem 2rem; margin-top:3rem; }
+        .footer-grid { display:grid; grid-template-columns:1fr 1fr; gap:2rem; max-width:900px; margin:0 auto; }
+        @media (min-width:600px) { .footer-grid { grid-template-columns:1fr 1fr 1fr; } }
+        .footer-brand img { height:60px; border-radius:10px; margin-bottom:0.8rem; }
+        .footer-brand p { color:var(--muted); font-size:0.85rem; line-height:1.6; }
+        .footer-title { font-family:var(--font-h); font-size:1rem; color:var(--primary); letter-spacing:1px; margin-bottom:1rem; text-transform:uppercase; }
+        .footer-info { display:flex; flex-direction:column; gap:0.6rem; }
+        .footer-info-item { display:flex; align-items:flex-start; gap:0.6rem; color:var(--muted); font-size:0.85rem; }
+        .footer-info-item span:first-child { font-size:1rem; flex-shrink:0; }
+        .social-links { display:flex; gap:0.8rem; flex-wrap:wrap; }
+        .social-btn { display:flex; align-items:center; gap:0.5rem; background:var(--card); border:1px solid var(--border); color:var(--text); text-decoration:none; padding:0.6rem 1rem; border-radius:10px; font-size:0.85rem; transition:all 0.2s; }
+        .social-btn:hover { border-color:var(--primary); color:var(--primary); }
+        .social-btn svg { width:18px; height:18px; fill:currentColor; }
+        .footer-bottom { text-align:center; color:#666; font-size:0.75rem; margin-top:2.5rem; padding-top:1.5rem; border-top:1px solid var(--border); }
+
+        /* ── CARRITO FLOTANTE ── */
+        .floating-cart { position:fixed; bottom:1.5rem; right:1.5rem; background:var(--primary); color:white; border:none; border-radius:50px; padding:1rem 1.5rem; font-size:1.4rem; cursor:pointer; box-shadow:0 5px 20px rgba(242,139,36,0.5); display:flex; align-items:center; gap:0.6rem; z-index:100; transition:transform 0.2s; }
+        .floating-cart:hover { transform:scale(1.05); }
+        .cart-count { background:white; color:var(--primary); font-family:var(--font-h); font-size:1rem; font-weight:bold; border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center; }
+    </style>
+</head>
+<body>
+
+<!-- BANNER CERRADO -->
+<div class="closed-banner" id="closed-banner">
+    <h3>🔴 Estamos cerrados</h3>
+    <p id="closed-msg">Abrimos Martes a Domingo desde las 5:00 PM. ¡Te esperamos!</p>
+</div>
+
+<!-- TOPBAR -->
+<header class="topbar">
+    <div class="topbar-logo">
+        <img id="brand-logo" src="assets/LOGO.jpeg" alt="Logo" onerror="this.style.display='none'">
+        <span class="topbar-brand-name" id="brand-name">RAÍCES BURGER</span>
+    </div>
+    <div class="topbar-right">
+        <div class="status-badge" id="status-badge">
+            <span class="status-dot open" id="status-dot"></span>
+            <span id="status-text">Cargando...</span>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙</button>
+    </div>
+</header>
+
+<!-- SLIDER -->
+<div class="slider" id="slider"></div>
+
+<!-- CATEGORÍAS -->
+<nav class="cat-nav" id="cat-nav"></nav>
+
+<!-- PRODUCTOS -->
+<main id="products-list">
+    <p style="color:#888; text-align:center; padding:4rem;">Cargando menú...</p>
+</main>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div class="footer-grid">
+        <div class="footer-brand">
+            <img src="assets/LOGO.jpeg" alt="Logo" onerror="this.style.display='none'">
+            <p>Las mejores hamburguesas al carbón en Villa del Rosario, Cúcuta.</p>
+        </div>
+        <div>
+            <p class="footer-title">Horario</p>
+            <div class="footer-info">
+                <div class="footer-info-item"><span>🔴</span><span>Lunes: Cerrado</span></div>
+                <div class="footer-info-item"><span>🟠</span><span>Mar–Jue: 5:00PM – 10:00PM</span></div>
+                <div class="footer-info-item"><span>🟢</span><span>Vie–Sáb: 5:00PM – 11:00PM</span></div>
+                <div class="footer-info-item"><span>🟠</span><span>Dom y Festivos: 5:00PM – 10:00PM</span></div>
+                <div class="footer-info-item"><span>📍</span><span>Villa del Rosario, N. de Santander</span></div>
+                <div class="footer-info-item"><span>📱</span><span>324 465 2909</span></div>
+            </div>
+        </div>
+        <div>
+            <p class="footer-title">Síguenos</p>
+            <div class="social-links">
+                <a href="https://www.facebook.com/share/1FpV8PxQX3/?mibextid=wwXIfr" target="_blank" class="social-btn">
+                    <svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>Facebook
+                </a>
+                <a href="https://www.instagram.com/raices_burger?igsh=MTVkdmNwNG04ZnRvYg==" target="_blank" class="social-btn">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z" fill="var(--bg)"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" stroke="var(--bg)" stroke-width="2"/></svg>Instagram
+                </a>
+                <a href="https://wa.me/573244652909" target="_blank" class="social-btn">
+                    <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.985-1.406A9.954 9.954 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>WhatsApp
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="footer-bottom">© 2025 Raíces Burger · Villa del Rosario · Todos los derechos reservados</div>
+</footer>
+
+<button class="floating-cart" onclick="openModal()">🛒 <span class="cart-count" id="cart-count">0</span></button>
+
+<div class="modal-overlay" id="checkout-modal">
+    <div class="modal-content">
+        <button class="close-modal" onclick="closeModal()">✕</button>
+        <h2 class="modal-title">Tu Pedido</h2>
+        <div class="cart-items" id="cart-items"><p class="empty-msg">Tu carrito está vacío</p></div>
+        <div class="cart-total-section"><span>Total:</span><span id="cart-total" class="total-amount">$0</span></div>
+        <div class="payment-info">
+            <h3>Métodos de pago aceptados</h3>
+            <p>Transferencia Nequi o Efectivo al recibir.</p>
+            <div class="qr-placeholder">
+                <img src="assets/qr_cropped.jpg" alt="QR Nequi" onerror="this.style.display='none'">
+                <p id="nequi-info">Envía a Nequi: 324 4652909<br><small>A nombre de: <strong>STEVEN DIAZ</strong></small></p>
+            </div>
+        </div>
+        <button class="btn-whatsapp" onclick="sendOrder()">📱 ENVIAR PEDIDO POR WHATSAPP</button>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+const SUPABASE_URL_IDX      = 'https://qlrdebzfxpurhzggaqzi.supabase.co';
+const SUPABASE_ANON_KEY_IDX = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFscmRlYnpmeHB1cmh6Z2dhcXppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MTc4NjEsImV4cCI6MjA5MTA5Mzg2MX0.ieVrQLa2lJlLSk-jjEh0OOnVsva-tzvSgZ2yesy8IEU';
+const sbMenu = supabase.createClient(SUPABASE_URL_IDX, SUPABASE_ANON_KEY_IDX);
+
+const CATEGORIAS = [
+    { key:'Hamburguesas', icon:'🍔', desc:'Al carbón, con ingredientes frescos' },
+    { key:'Perros',       icon:'🌭', desc:'Los mejores perros de la ciudad' },
+    { key:'Salchipapas',  icon:'🍟', desc:'Crujientes y llenas de sabor' },
+    { key:'Bebidas',      icon:'🥤', desc:'Refrescantes para acompañar' },
+];
+
+// ── HORARIO REAL ──
+const HORARIO = {
+    0: { abierto: true,  inicio: 17, fin: 22 }, // Domingo
+    1: { abierto: false },                        // Lunes - CERRADO
+    2: { abierto: true,  inicio: 17, fin: 22 }, // Martes
+    3: { abierto: true,  inicio: 17, fin: 22 }, // Miércoles
+    4: { abierto: true,  inicio: 17, fin: 22 }, // Jueves
+    5: { abierto: true,  inicio: 17, fin: 23 }, // Viernes
+    6: { abierto: true,  inicio: 17, fin: 23 }, // Sábado
+};
+
+function verificarHorario() {
+    const ahora = new Date();
+    const dia = ahora.getDay();
+    const hora = ahora.getHours();
+    const horaDia = HORARIO[dia];
+
+    const dot  = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    const banner = document.getElementById('closed-banner');
+
+    if (!horaDia.abierto || hora < horaDia.inicio || hora >= horaDia.fin) {
+        dot.className = 'status-dot closed';
+        text.textContent = 'Cerrado ahora';
+        banner.classList.add('show');
+        const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+        document.getElementById('closed-msg').textContent =
+            dia === 1 ? 'Hoy es lunes, no abrimos. ¡Vuelve el martes a las 5:00 PM!' :
+            hora < (horaDia.abierto ? horaDia.inicio : 17) ?
+            `Hoy abrimos a las ${horaDia.abierto ? horaDia.inicio : 17}:00 PM. ¡Te esperamos!` :
+            'Abrimos Martes a Domingo desde las 5:00 PM. ¡Te esperamos!';
+    } else {
+        const minutos = 60 - ahora.getMinutes();
+        const cierreHora = horaDia.fin;
+        dot.className = 'status-dot open';
+        text.textContent = `Abierto · Cierra ${cierreHora}:00 PM`;
+        banner.classList.remove('show');
+    }
+}
+
+// ── TEMA ──
+function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    document.getElementById('theme-btn').textContent = isDark ? '🌙' : '☀️';
+    localStorage.setItem('rb_theme', isDark ? 'light' : 'dark');
+}
+
+function cargarTema() {
+    const tema = localStorage.getItem('rb_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', tema);
+    document.getElementById('theme-btn').textContent = tema === 'dark' ? '🌙' : '☀️';
+}
+
+function formatCOP(n) {
+    return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0}).format(n);
+}
+
+function aplicarConfig() {
+    try {
+        const cfg = JSON.parse(localStorage.getItem('rb_config')||'{}');
+        if (cfg.name) { document.getElementById('brand-name').textContent=cfg.name; document.getElementById('page-title').textContent=cfg.name+' - Menú Digital'; }
+        if (cfg.logo) document.getElementById('brand-logo').src=cfg.logo;
+        if (cfg.color) document.documentElement.style.setProperty('--primary', cfg.color);
+        if (cfg.nequi||cfg.titular) {
+            document.getElementById('nequi-info').innerHTML=`Envía a Nequi: ${cfg.nequi||'324 4652909'}<br><small>A nombre de: <strong>${cfg.titular||'STEVEN DIAZ'}</strong></small>`;
+        }
+    } catch(e) {}
+}
+
+// ── SLIDER ──
+let slideIndex = 0, slideInterval;
+
+function buildSlider(productos) {
+    const slider = document.getElementById('slider');
+    const featured = productos.filter(p => p.destacado);
+    const others = productos.filter(p => !p.destacado && p.imagen_url).slice(0, 5 - featured.length);
+    const slides = [...featured, ...others].slice(0, 5);
+    if (!slides.length) { slider.style.display='none'; return; }
+
+    slider.innerHTML = slides.map((p,i) => `
+        <div class="slide ${i===0?'active':''}" id="slide-${i}">
+            <img src="${p.imagen_url||''}" alt="${p.nombre}" onerror="this.src='https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=1200&q=80'">
+            <div class="slide-overlay"></div>
+            <div class="slide-content">
+                ${p.destacado?'<span class="slide-tag">⭐ Recomendada</span>':'<span class="slide-tag">🔥 Destacada</span>'}
+                <div class="slide-title">${p.nombre}</div>
+                <div class="slide-price">${formatCOP(p.precio)}</div>
+            </div>
+        </div>
+    `).join('') + `<div class="slider-dots">${slides.map((_,i)=>`<div class="dot ${i===0?'active':''}" onclick="goToSlide(${i})"></div>`).join('')}</div>`;
+
+    if (slides.length > 1) {
+        slideInterval = setInterval(() => { slideIndex=(slideIndex+1)%slides.length; updateSlider(slides.length); }, 4000);
+    }
+}
+
+function goToSlide(n) {
+    slideIndex = n;
+    updateSlider(document.querySelectorAll('.slide').length);
+    clearInterval(slideInterval);
+    slideInterval = setInterval(() => { slideIndex=(slideIndex+1)%document.querySelectorAll('.slide').length; updateSlider(document.querySelectorAll('.slide').length); }, 4000);
+}
+
+function updateSlider(total) {
+    document.querySelectorAll('.slide').forEach((s,i)=>s.classList.toggle('active',i===slideIndex));
+    document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('active',i===slideIndex));
+}
+
+// ── SCROLL SPY ──
+function initScrollSpy(cats) {
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+            if (e.isIntersecting) {
+                const key = e.target.id.replace('cat-','');
+                document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+                const btn = document.querySelector(`[data-cat="${key}"]`);
+                if (btn) btn.classList.add('active');
+            }
+        });
+    }, { rootMargin:'-10% 0px -80% 0px' });
+    cats.forEach(c => { const el=document.getElementById('cat-'+c.key); if(el) observer.observe(el); });
+}
+
+function scrollToCategoria(key) {
+    const el = document.getElementById('cat-'+key);
+    if (el) el.scrollIntoView({behavior:'smooth'});
+    document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+    const btn = document.querySelector(`[data-cat="${key}"]`);
+    if (btn) { btn.classList.add('active'); btn.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}); }
+}
+
+// ── CARGAR PRODUCTOS ──
+async function cargarProductos() {
+    const { data, error } = await sbMenu.from('productos').select('*').eq('activo',true).order('orden');
+    const container = document.getElementById('products-list');
+    const nav = document.getElementById('cat-nav');
+
+    if (error || !data || !data.length) {
+        container.innerHTML = '<p style="color:#888;text-align:center;padding:4rem;">No hay productos disponibles.</p>';
+        return;
+    }
+
+    buildSlider(data);
+
+    const catsVisibles = CATEGORIAS.filter(c => data.some(p => (p.categoria||'Hamburguesas')===c.key));
+
+    nav.innerHTML = catsVisibles.map((c,i) => `
+        <button class="cat-btn ${i===0?'active':''}" data-cat="${c.key}" onclick="scrollToCategoria('${c.key}')">
+            <span class="cat-icon">${c.icon}</span>${c.key}
+        </button>
+    `).join('');
+
+    container.innerHTML = catsVisibles.map(cat => {
+        const prods = data.filter(p => (p.categoria||'Hamburguesas')===cat.key);
+        return `
+            <div id="cat-${cat.key}" class="cat-section">
+                <div class="section-header">
+                    <div class="section-header-icon">${cat.icon}</div>
+                    <div class="section-header-text"><h2>${cat.key.toUpperCase()}</h2><p>${cat.desc}</p></div>
+                </div>
+                <div class="products-section-grid">
+                    ${prods.map(p => `
+                        <div class="product-card-premium ${p.destacado?'featured':''} ${p.agotado?'agotado':''}">
+                            <div class="card-img-wrap">
+                                <img src="${p.imagen_url||''}" alt="${p.nombre}" onerror="this.src='https://via.placeholder.com/400x200/1a1a1a/f28b24?text=${encodeURIComponent(p.nombre)}'">
+                                ${p.agotado ? '<div class="agotado-overlay"><span>AGOTADO</span></div>' : ''}
+                                ${p.destacado && !p.agotado ? '<span class="card-badge">⭐ Recomendada</span>' : ''}
+                                ${p.agotado ? '<span class="card-badge agotado-badge">Agotado</span>' : ''}
+                            </div>
+                            <div class="card-body">
+                                <div class="card-name">${p.nombre}</div>
+                                <div class="card-desc" id="desc-${p.id}">${p.descripcion||''}</div>
+                                ${p.descripcion && p.descripcion.length > 60 ? `<button class="btn-ver-mas" onclick="toggleDesc('desc-${p.id}', this)">Ver más ▾</button>` : ''}
+                                <div class="card-footer">
+                                    <span class="card-price">${formatCOP(p.precio)}</span>
+                                    <button class="btn-agregar" onclick="addToCart('${p.nombre.replace(/'/g,"\\'")}', ${p.precio})" ${p.agotado?'disabled':''}>
+                                        ${p.agotado ? 'Agotado' : '+ Agregar'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    initScrollSpy(catsVisibles);
+}
+
+function toggleDesc(id, btn) {
+    const el = document.getElementById(id);
+    if (el.classList.contains('expanded')) {
+        el.classList.remove('expanded');
+        btn.textContent = 'Ver más ▾';
+    } else {
+        el.classList.add('expanded');
+        btn.textContent = 'Ver menos ▴';
+    }
+}
+
+cargarTema();
+aplicarConfig();
+verificarHorario();
+cargarProductos();
+</script>
+</body>
+</html>

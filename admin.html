@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel — Raíces Burger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #f28b24; --primary-dark: #cc741c; --bg: #0a0a0a; --card: #141414;
+            --card2: #1c1c1c; --border: #2a2a2a; --text: #ffffff; --muted: #888;
+            --red: #e74c3c; --font-h: 'Oswald', sans-serif; --font-b: 'Poppins', sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg); color: var(--text); font-family: var(--font-b); min-height: 100vh; }
+
+        #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:radial-gradient(ellipse at 60% 40%, rgba(242,139,36,0.12) 0%, transparent 70%), var(--bg); }
+        .login-box { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:3rem 2.5rem; width:100%; max-width:400px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.6); }
+        .login-logo { font-family:var(--font-h); font-size:2.2rem; color:var(--primary); letter-spacing:2px; margin-bottom:0.3rem; }
+        .login-sub { color:var(--muted); font-size:0.85rem; margin-bottom:2rem; }
+        .login-box input { width:100%; background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:0.9rem 1.2rem; color:var(--text); font-family:var(--font-b); font-size:1rem; margin-bottom:1rem; outline:none; transition:border-color 0.2s; }
+        .login-box input:focus { border-color:var(--primary); }
+        .btn-login { width:100%; background:var(--primary); color:white; border:none; border-radius:10px; padding:0.9rem; font-family:var(--font-h); font-size:1.2rem; cursor:pointer; transition:background 0.2s; }
+        .btn-login:hover { background:var(--primary-dark); }
+        .btn-login:disabled { opacity:0.6; cursor:not-allowed; }
+        .login-error { color:var(--red); font-size:0.85rem; margin-top:0.8rem; display:none; }
+
+        #dashboard { display:none; }
+        .topbar { background:var(--card); border-bottom:1px solid var(--border); padding:1rem 2rem; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+        .topbar-brand { font-family:var(--font-h); font-size:1.4rem; color:var(--primary); }
+        .topbar-brand span { color:var(--muted); font-size:0.85rem; font-family:var(--font-b); font-weight:300; margin-left:0.8rem; }
+        .btn-logout { background:transparent; border:1px solid var(--border); color:var(--muted); padding:0.5rem 1rem; border-radius:8px; cursor:pointer; font-size:0.85rem; transition:all 0.2s; }
+        .btn-logout:hover { border-color:var(--red); color:var(--red); }
+
+        .tabs { display:flex; gap:0.5rem; padding:1.5rem 2rem 0; border-bottom:1px solid var(--border); background:var(--card); overflow-x:auto; }
+        .tab { padding:0.7rem 1.5rem; border:none; background:transparent; color:var(--muted); font-family:var(--font-h); font-size:1rem; cursor:pointer; border-bottom:3px solid transparent; transition:all 0.2s; white-space:nowrap; }
+        .tab:hover { color:var(--text); }
+        .tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+
+        .content { padding:2rem; max-width:1100px; margin:0 auto; }
+        .tab-panel { display:none; }
+        .tab-panel.active { display:block; }
+        .panel-title { font-family:var(--font-h); font-size:1.8rem; margin-bottom:0.3rem; }
+        .panel-desc { color:var(--muted); font-size:0.9rem; margin-bottom:2rem; }
+
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:2.5rem; }
+        .stat-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.5rem; transition:transform 0.2s; }
+        .stat-card:hover { transform:translateY(-3px); }
+        .stat-icon { font-size:2rem; margin-bottom:0.5rem; }
+        .stat-label { color:var(--muted); font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; }
+        .stat-value { font-family:var(--font-h); font-size:2rem; color:var(--primary); }
+
+        .products-admin { display:grid; gap:1rem; }
+        .product-row { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.2rem 1.5rem; display:grid; grid-template-columns:70px 1fr auto auto; gap:1rem; align-items:center; }
+        .product-row img { width:70px; height:55px; object-fit:cover; border-radius:8px; }
+        .prod-name { font-family:var(--font-h); font-size:1.1rem; }
+        .prod-ing { color:var(--muted); font-size:0.8rem; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:400px; }
+        .prod-price { font-family:var(--font-h); color:var(--primary); font-size:1.2rem; white-space:nowrap; }
+        .btn-edit { background:var(--card2); border:1px solid var(--border); color:var(--text); padding:0.5rem 1rem; border-radius:8px; cursor:pointer; font-size:0.85rem; transition:all 0.2s; white-space:nowrap; }
+        .btn-edit:hover { border-color:var(--primary); color:var(--primary); }
+        .btn-add-product { background:var(--primary); border:none; color:white; padding:0.9rem 1.5rem; border-radius:10px; font-family:var(--font-h); font-size:1.1rem; cursor:pointer; margin-bottom:1.5rem; transition:background 0.2s; }
+        .btn-add-product:hover { background:var(--primary-dark); }
+
+        .orders-list { display:grid; gap:1rem; }
+        .order-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.5rem; }
+        .order-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; padding-bottom:0.8rem; border-bottom:1px solid var(--border); }
+        .order-id { font-family:var(--font-h); color:var(--primary); font-size:1.1rem; }
+        .order-date { color:var(--muted); font-size:0.85rem; }
+        .order-total { font-family:var(--font-h); font-size:1.3rem; }
+        .order-items { display:flex; flex-wrap:wrap; gap:0.5rem; }
+        .order-item-tag { background:var(--card2); border:1px solid var(--border); border-radius:6px; padding:0.3rem 0.7rem; font-size:0.8rem; color:var(--muted); }
+        .empty-orders { text-align:center; padding:4rem; color:var(--muted); }
+        .empty-orders .big { font-size:3rem; margin-bottom:1rem; }
+
+        .config-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+        @media (max-width:700px) { .config-grid { grid-template-columns:1fr; } }
+        .config-section { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.5rem; }
+        .config-section h3 { font-family:var(--font-h); font-size:1.2rem; margin-bottom:1.2rem; color:var(--primary); }
+        .form-group { margin-bottom:1rem; }
+        .form-group label { display:block; font-size:0.8rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.4rem; }
+        .form-group input, .form-group textarea { width:100%; background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:0.75rem 1rem; color:var(--text); font-family:var(--font-b); font-size:0.95rem; outline:none; transition:border-color 0.2s; }
+        .form-group input:focus, .form-group textarea:focus { border-color:var(--primary); }
+        .form-group textarea { resize:vertical; min-height:80px; }
+        .btn-save { background:var(--primary); border:none; color:white; padding:0.8rem 1.5rem; border-radius:8px; font-family:var(--font-h); font-size:1rem; cursor:pointer; transition:background 0.2s; margin-top:0.5rem; }
+        .btn-save:hover { background:var(--primary-dark); }
+        .color-row { display:flex; gap:0.8rem; align-items:center; }
+        .color-row input[type="color"] { width:50px; height:40px; padding:2px; cursor:pointer; border-radius:6px; }
+
+        .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(6px); z-index:1000; display:none; align-items:center; justify-content:center; }
+        .modal-bg.open { display:flex; }
+        .modal-box { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:2rem; width:90%; max-width:500px; max-height:90vh; overflow-y:auto; }
+        .modal-box h2 { font-family:var(--font-h); font-size:1.6rem; margin-bottom:1.5rem; color:var(--primary); }
+        .modal-actions { display:flex; gap:0.8rem; margin-top:1.5rem; }
+        .btn-cancel { flex:1; background:transparent; border:1px solid var(--border); color:var(--muted); padding:0.8rem; border-radius:8px; cursor:pointer; transition:all 0.2s; }
+        .btn-cancel:hover { border-color:var(--red); color:var(--red); }
+        .btn-save-modal { flex:2; background:var(--primary); border:none; color:white; padding:0.8rem; border-radius:8px; font-family:var(--font-h); font-size:1.1rem; cursor:pointer; transition:background 0.2s; }
+        .btn-save-modal:hover { background:var(--primary-dark); }
+        .btn-save-modal:disabled { opacity:0.6; cursor:not-allowed; }
+        .btn-delete-modal { background:transparent; border:1px solid var(--red); color:var(--red); padding:0.8rem; border-radius:8px; cursor:pointer; transition:all 0.2s; }
+        .btn-delete-modal:hover { background:var(--red); color:white; }
+
+        #img-upload-zone { border:2px dashed var(--border); border-radius:12px; height:180px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; margin-bottom:1rem; position:relative; overflow:hidden; transition:border-color 0.2s; background:var(--card2); }
+        #img-upload-zone:hover { border-color:var(--primary); }
+
+        .toggle-switch { position:relative; display:inline-block; width:44px; height:24px; }
+        .toggle-switch input { opacity:0; width:0; height:0; }
+        .slider { position:absolute; cursor:pointer; inset:0; background:var(--border); border-radius:24px; transition:0.3s; }
+        .slider:before { content:''; position:absolute; width:18px; height:18px; left:3px; bottom:3px; background:white; border-radius:50%; transition:0.3s; }
+        input:checked + .slider { background:var(--primary); }
+        input:checked + .slider:before { transform:translateX(20px); }
+        .featured-row { display:flex; align-items:center; gap:0.8rem; font-size:0.9rem; color:var(--muted); }
+
+        .toast-admin { position:fixed; bottom:2rem; right:2rem; background:var(--primary); color:white; padding:1rem 1.5rem; border-radius:10px; font-family:var(--font-h); font-size:1rem; z-index:9999; opacity:0; transform:translateY(10px); transition:all 0.3s; pointer-events:none; }
+        .toast-admin.show { opacity:1; transform:translateY(0); }
+
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; margin-right:6px; }
+
+        @media (max-width:600px) { .product-row { grid-template-columns:60px 1fr; } .content { padding:1rem; } }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-box">
+        <div class="login-logo">🔥 RAÍCES BURGER</div>
+        <p class="login-sub">Panel de Administración</p>
+        <input type="email" id="login-user" placeholder="Correo electrónico" autocomplete="off">
+        <input type="password" id="login-pass" placeholder="Contraseña">
+        <button class="btn-login" id="btn-login-submit" onclick="doLogin()">ENTRAR</button>
+        <p class="login-error" id="login-error">Correo o contraseña incorrectos</p>
+    </div>
+</div>
+
+<div id="dashboard">
+    <div class="topbar">
+        <div class="topbar-brand">🔥 RAÍCES BURGER <span>Panel Admin</span></div>
+        <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
+    </div>
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('resumen')">📊 Resumen</button>
+        <button class="tab" onclick="switchTab('productos')">🍔 Productos</button>
+        <button class="tab" onclick="switchTab('pedidos')">📋 Pedidos</button>
+        <button class="tab" onclick="switchTab('clientes')">👥 Clientes</button>
+        <button class="tab" onclick="switchTab('config')">⚙️ Configuración</button>
+    </div>
+    <div class="content">
+
+        <div class="tab-panel active" id="panel-resumen">
+            <h2 class="panel-title">Resumen del negocio</h2>
+            <p class="panel-desc">Vista general de hoy.</p>
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">Pedidos hoy</div><div class="stat-value" id="stat-orders">—</div></div>
+                <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Ventas hoy</div><div class="stat-value" id="stat-sales">—</div></div>
+                <div class="stat-card"><div class="stat-icon">🍔</div><div class="stat-label">Productos activos</div><div class="stat-value" id="stat-products">—</div></div>
+                <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-label">Más vendida</div><div class="stat-value" style="font-size:1.1rem" id="stat-top">—</div></div>
+            </div>
+            <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.5rem;">
+                <h3 style="font-family:var(--font-h); margin-bottom:1rem; color:var(--muted); font-size:1rem; text-transform:uppercase; letter-spacing:1px;">Últimos 5 pedidos</h3>
+                <div id="recent-orders-list"><p style="color:var(--muted)">Cargando...</p></div>
+            </div>
+            <div id="dashboard-ventas" style="margin-top:1.5rem;"></div>
+        </div>
+
+        <div class="tab-panel" id="panel-productos">
+            <h2 class="panel-title">Gestión de Productos</h2>
+            <p class="panel-desc">Los cambios se ven en el menú al instante desde cualquier dispositivo.</p>
+            <button class="btn-add-product" onclick="openNewProduct()">+ Agregar nuevo producto</button>
+            <div class="products-admin" id="products-admin-list"><p style="color:var(--muted)">Cargando...</p></div>
+        </div>
+
+        <div class="tab-panel" id="panel-pedidos">
+            <h2 class="panel-title">Historial de Pedidos</h2>
+            <p class="panel-desc">Todos los pedidos enviados por WhatsApp.</p>
+            <div style="margin-bottom:1.5rem;">
+                <button class="btn-save" onclick="exportOrders()" style="background:var(--card2); border:1px solid var(--border); color:var(--text);">📥 Exportar CSV</button>
+            </div>
+            <div class="orders-list" id="orders-list"><p style="color:var(--muted)">Cargando...</p></div>
+        </div>
+
+        <div class="tab-panel" id="panel-clientes">
+            <h2 class="panel-title">Registro de Clientes</h2>
+            <p class="panel-desc">Clientes registrados al hacer pedidos.</p>
+            <div style="margin-bottom:1.5rem;">
+                <button class="btn-save" onclick="exportClientes()" style="background:var(--card2); border:1px solid var(--border); color:var(--text);">📥 Exportar CSV</button>
+            </div>
+            <div id="clientes-list"><p style="color:var(--muted)">Cargando...</p></div>
+        </div>
+
+        <div class="tab-panel" id="panel-config">
+            <h2 class="panel-title">Configuración</h2>
+            <p class="panel-desc">Personaliza el menú del restaurante.</p>
+            <div class="config-grid">
+                <div class="config-section">
+                    <h3>🏪 Datos del negocio</h3>
+                    <div class="form-group"><label>Nombre del restaurante</label><input type="text" id="cfg-name"></div>
+                    <div class="form-group"><label>Eslogan</label><input type="text" id="cfg-slogan"></div>
+                    <div class="form-group"><label>WhatsApp (con código país)</label><input type="text" id="cfg-whatsapp"></div>
+                    <div class="form-group"><label>Número Nequi visible</label><input type="text" id="cfg-nequi"></div>
+                    <div class="form-group"><label>Titular Nequi</label><input type="text" id="cfg-titular"></div>
+                    <button class="btn-save" onclick="saveConfig()">💾 Guardar</button>
+                </div>
+                <div class="config-section">
+                    <h3>🎨 Apariencia</h3>
+                    <div class="form-group"><label>Color principal</label><div class="color-row"><input type="color" id="cfg-color" value="#f28b24"><span id="cfg-color-hex" style="color:var(--muted)">#f28b24</span></div></div>
+                    <div class="form-group"><label>URL del logo</label><input type="text" id="cfg-logo"></div>
+                    <div class="form-group"><label>URL imagen de fondo</label><input type="text" id="cfg-hero"></div>
+                    <button class="btn-save" onclick="saveConfig()">💾 Guardar</button>
+                </div>
+                <div class="config-section" style="grid-column:1/-1;">
+                    <h3>📱 Mensaje de WhatsApp</h3>
+                    <p style="color:var(--muted); font-size:0.85rem; margin-bottom:1rem;">Usa <code style="color:var(--primary)">{items}</code> y <code style="color:var(--primary)">{total}</code> como variables.</p>
+                    <div class="form-group"><textarea id="cfg-wamsg" rows="5"></textarea></div>
+                    <button class="btn-save" onclick="saveConfig()">💾 Guardar</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- MODAL PRODUCTO -->
+<div class="modal-bg" id="product-modal">
+    <div class="modal-box">
+        <h2 id="modal-title">Editar Producto</h2>
+        <input type="hidden" id="edit-index">
+        <div id="img-upload-zone"
+            onclick="document.getElementById('edit-img-file').click()"
+            ondragover="event.preventDefault(); this.style.borderColor='var(--primary)'"
+            ondragleave="this.style.borderColor='var(--border)'"
+            ondrop="handleImgDrop(event)">
+            <img id="modal-img-preview" src="" alt="Preview" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; border-radius:10px;">
+            <div id="upload-placeholder" style="text-align:center; z-index:1; pointer-events:none;">
+                <div style="font-size:2.5rem; margin-bottom:0.5rem;">📷</div>
+                <div style="color:var(--muted); font-size:0.9rem;">Haz clic o arrastra una foto aquí</div>
+                <div style="color:var(--muted); font-size:0.75rem; margin-top:0.3rem;">JPG, PNG, WEBP — máx 3MB</div>
+            </div>
+            <div id="img-change-overlay" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; border-radius:10px; z-index:2;">
+                <span style="color:white; font-family:var(--font-h);">📷 CAMBIAR FOTO</span>
+            </div>
+        </div>
+        <input type="file" id="edit-img-file" accept="image/*" style="display:none" onchange="handleImgFile(this)">
+        <div class="form-group"><label>Nombre del producto</label><input type="text" id="edit-name" placeholder="LA LLANERA"></div>
+        <div class="form-group"><label>Precio (solo número)</label><input type="number" id="edit-price" placeholder="20000"></div>
+        <div class="form-group"><label>Descripción / Ingredientes</label><textarea id="edit-ing" rows="4" placeholder="Pan brioche, carne al carbón..."></textarea></div>
+        <div class="form-group">
+            <label>Categoría</label>
+            <select id="edit-categoria" style="width:100%; background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:0.75rem 1rem; color:var(--text); font-family:var(--font-b); font-size:0.95rem; outline:none;">
+                <option value="Hamburguesas">🍔 Hamburguesas</option>
+                <option value="Perros">🌭 Perros</option>
+                <option value="Salchipapas">🍟 Salchipapas</option>
+                <option value="Bebidas">🥤 Bebidas</option>
+            </select>
+        </div>
+        <div class="featured-row" style="margin-bottom:0.8rem;">
+            <label class="toggle-switch"><input type="checkbox" id="edit-featured"><span class="slider"></span></label>
+            <span>Marcar como RECOMENDADA ⭐</span>
+        </div>
+        <div class="featured-row" style="margin-bottom:1rem;">
+            <label class="toggle-switch"><input type="checkbox" id="edit-agotado"><span class="slider" style="background:var(--red)"></span></label>
+            <span>Marcar como AGOTADO 🚫</span>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeProductModal()">Cancelar</button>
+            <button class="btn-delete-modal" id="btn-delete-prod" onclick="deleteProduct()" style="display:none">🗑️</button>
+            <button class="btn-save-modal" id="btn-save-prod" onclick="saveProduct()">GUARDAR</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-admin" id="toast-admin"></div>
+
+<script>
+// ╔══════════════════════════════════════════════╗
+// ║  PEGA TUS CREDENCIALES DE SUPABASE AQUÍ      ║
+// ╚══════════════════════════════════════════════╝
+const SUPABASE_URL  = 'https://qlrdebzfxpurhzggaqzi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFscmRlYnpmeHB1cmh6Z2dhcXppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MTc4NjEsImV4cCI6MjA5MTA5Mzg2MX0.ieVrQLa2lJlLSk-jjEh0OOnVsva-tzvSgZ2yesy8IEU';
+// ════════════════════════════════════════════════
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── UTILS ──
+function formatCOP(n) {
+    return new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', minimumFractionDigits:0 }).format(n);
+}
+function showToast(msg) {
+    const t = document.getElementById('toast-admin');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+}
+function setBtnLoading(id, on, label) {
+    const b = document.getElementById(id); if (!b) return;
+    b.disabled = on;
+    b.innerHTML = on ? `<span class="spinner"></span>${label}` : label;
+}
+
+// ── AUTH ──
+async function doLogin() {
+    const email = document.getElementById('login-user').value.trim();
+    const pass  = document.getElementById('login-pass').value;
+    if (!email || !pass) { showErr('Completa los campos'); return; }
+    setBtnLoading('btn-login-submit', true, 'Entrando...');
+    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    setBtnLoading('btn-login-submit', false, 'ENTRAR');
+    if (error) { showErr('Correo o contraseña incorrectos'); }
+    else { mostrarDashboard(); }
+}
+function showErr(msg) {
+    const e = document.getElementById('login-error');
+    e.textContent = msg; e.style.display = 'block';
+}
+async function doLogout() {
+    await sb.auth.signOut();
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('login-user').value = '';
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-error').style.display = 'none';
+}
+function mostrarDashboard() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    initDashboard();
+}
+async function checkSession() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) mostrarDashboard();
+}
+document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+
+// ── TABS ──
+function switchTab(id) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    const tabs = ['resumen','productos','pedidos','clientes','config'];
+    document.querySelectorAll('.tab')[tabs.indexOf(id)].classList.add('active');
+    document.getElementById('panel-'+id).classList.add('active');
+    if (id==='resumen')   renderResumen();
+    if (id==='productos') renderProducts();
+    if (id==='pedidos')   renderOrders();
+    if (id==='clientes')  renderClientes();
+    if (id==='config')    loadConfig();
+}
+function initDashboard() { renderResumen(); renderProducts(); }
+
+// ── RESUMEN ──
+async function renderResumen() {
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const { data: pedidosHoy } = await sb.from('pedidos').select('total').gte('created_at', hoy.toISOString());
+    document.getElementById('stat-orders').textContent = (pedidosHoy||[]).length;
+    document.getElementById('stat-sales').textContent  = formatCOP((pedidosHoy||[]).reduce((s,p)=>s+p.total,0));
+
+    const { count } = await sb.from('productos').select('*',{count:'exact',head:true}).eq('activo',true);
+    document.getElementById('stat-products').textContent = count||0;
+
+    const { data: todos } = await sb.from('pedidos').select('items,total,created_at');
+    const cnt = {};
+    (todos||[]).forEach(p=>(p.items||[]).forEach(i=>{ cnt[i.name]=(cnt[i.name]||0)+i.quantity; }));
+    const top = Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
+    document.getElementById('stat-top').textContent = top ? top[0].split(' ')[0] : '—';
+
+    // Últimos 5 pedidos
+    const { data: recientes } = await sb.from('pedidos').select('*').order('created_at',{ascending:false}).limit(5);
+    const el = document.getElementById('recent-orders-list');
+    if (!recientes||!recientes.length) { el.innerHTML='<div class="empty-orders"><div class="big">📋</div><p>Aún no hay pedidos.</p></div>'; }
+    else {
+        el.innerHTML = recientes.map(o=>`
+            <div style="display:flex; justify-content:space-between; padding:0.8rem 0; border-bottom:1px solid var(--border); align-items:center;">
+                <div><span style="font-family:var(--font-h); color:var(--primary)">#${o.id}</span>
+                <span style="color:var(--muted); font-size:0.8rem; margin-left:0.8rem">${new Date(o.created_at).toLocaleString('es-CO')}</span></div>
+                <span style="font-family:var(--font-h)">${formatCOP(o.total)}</span>
+            </div>`).join('');
+    }
+
+    // ── DASHBOARD DE VENTAS ──
+    renderDashboard(todos||[]);
+}
+
+function renderDashboard(pedidos) {
+    const dashEl = document.getElementById('dashboard-ventas');
+    if (!dashEl) return;
+
+    // Ventas últimos 7 días
+    const hoy = new Date();
+    const dias = [];
+    const ventas = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(hoy);
+        d.setDate(d.getDate() - i);
+        d.setHours(0,0,0,0);
+        const dNext = new Date(d); dNext.setDate(dNext.getDate() + 1);
+        const total = pedidos
+            .filter(p => new Date(p.created_at) >= d && new Date(p.created_at) < dNext)
+            .reduce((s,p) => s + p.total, 0);
+        dias.push(['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d.getDay()]);
+        ventas.push(total);
+    }
+
+    const maxVenta = Math.max(...ventas, 1);
+
+    // Top productos
+    const cnt = {};
+    pedidos.forEach(p=>(p.items||[]).forEach(i=>{ cnt[i.name]=(cnt[i.name]||0)+i.quantity; }));
+    const topProds = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const maxCnt = topProds[0]?.[1] || 1;
+
+    // Total del mes
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const totalMes = pedidos.filter(p => new Date(p.created_at) >= inicioMes).reduce((s,p)=>s+p.total,0);
+    const ticketProm = pedidos.length ? Math.round(pedidos.reduce((s,p)=>s+p.total,0)/pedidos.length) : 0;
+
+    dashEl.innerHTML = `
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;">
+            <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.2rem;">
+                <div style="color:var(--muted); font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:0.3rem;">Ventas este mes</div>
+                <div style="font-family:var(--font-h); font-size:1.5rem; color:var(--primary);">${formatCOP(totalMes)}</div>
+            </div>
+            <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.2rem;">
+                <div style="color:var(--muted); font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:0.3rem;">Ticket promedio</div>
+                <div style="font-family:var(--font-h); font-size:1.5rem; color:var(--primary);">${formatCOP(ticketProm)}</div>
+            </div>
+        </div>
+
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.5rem; margin-bottom:1.5rem;">
+            <h3 style="font-family:var(--font-h); margin-bottom:1.2rem; color:var(--muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">📈 Ventas últimos 7 días</h3>
+            <div style="display:flex; align-items:flex-end; gap:0.5rem; height:120px;">
+                ${dias.map((d,i) => `
+                    <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:0.4rem;">
+                        <div style="font-size:0.7rem; color:var(--muted);">${ventas[i]>0?formatCOP(ventas[i]).replace('COP','').trim():''}</div>
+                        <div style="width:100%; background:${ventas[i]>0?'var(--primary)':'var(--border)'}; border-radius:6px 6px 0 0; height:${Math.round((ventas[i]/maxVenta)*90)+5}px; transition:height 0.5s ease; min-height:5px;"></div>
+                        <div style="font-family:var(--font-h); font-size:0.85rem; color:${ventas[i]>0?'var(--text)':'var(--muted)'};">${d}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        ${topProds.length ? `
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.5rem;">
+            <h3 style="font-family:var(--font-h); margin-bottom:1.2rem; color:var(--muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">🏆 Productos más vendidos</h3>
+            ${topProds.map(([nombre, qty]) => `
+                <div style="margin-bottom:0.8rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+                        <span style="font-size:0.9rem; color:var(--text);">${nombre}</span>
+                        <span style="font-family:var(--font-h); color:var(--primary);">${qty} uds</span>
+                    </div>
+                    <div style="background:var(--border); border-radius:4px; height:6px;">
+                        <div style="background:var(--primary); border-radius:4px; height:6px; width:${Math.round((qty/maxCnt)*100)}%; transition:width 0.5s ease;"></div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>` : ''}
+    `;
+}
+
+// ── PRODUCTOS ──
+let productosCache = [];
+async function renderProducts() {
+    const el = document.getElementById('products-admin-list');
+    el.innerHTML = '<p style="color:var(--muted)">Cargando...</p>';
+    const { data, error } = await sb.from('productos').select('*').order('orden');
+    if (error) { el.innerHTML='<p style="color:var(--red)">Error al cargar productos</p>'; return; }
+    productosCache = data||[];
+    el.innerHTML = productosCache.map(p=>`
+        <div class="product-row">
+            <img src="${p.imagen_url||''}" onerror="this.src='https://via.placeholder.com/70x55/222/f28b24?text=🍔'" alt="${p.nombre}">
+            <div>
+                <div class="prod-name">${p.nombre} ${p.destacado?'<span style="color:var(--primary);font-size:0.75rem">⭐ RECOMENDADA</span>':''}</div>
+                <div class="prod-ing">${p.descripcion||''}</div>
+            </div>
+            <div class="prod-price">${formatCOP(p.precio)}</div>
+            <button class="btn-edit" onclick="openEditProduct(${p.id})">✏️ Editar</button>
+        </div>`).join('');
+}
+
+function openEditProduct(id) {
+    const p = productosCache.find(x=>x.id===id); if (!p) return;
+    document.getElementById('modal-title').textContent = 'Editar Producto';
+    document.getElementById('edit-index').value = id;
+    document.getElementById('edit-name').value = p.nombre;
+    document.getElementById('edit-price').value = p.precio;
+    document.getElementById('edit-ing').value = p.descripcion||'';
+    document.getElementById('edit-categoria').value = p.categoria||'Hamburguesas';
+    document.getElementById('edit-featured').checked = p.destacado;
+    document.getElementById('edit-agotado').checked = p.agotado||false;
+    document.getElementById('btn-delete-prod').style.display = 'inline-block';
+    setImgPreview(p.imagen_url||'');
+    window._imgFile = null;
+    document.getElementById('product-modal').classList.add('open');
+}
+function openNewProduct() {
+    document.getElementById('modal-title').textContent = 'Nuevo Producto';
+    document.getElementById('edit-index').value = '';
+    document.getElementById('edit-name').value = '';
+    document.getElementById('edit-price').value = '';
+    document.getElementById('edit-ing').value = '';
+    document.getElementById('edit-categoria').value = 'Hamburguesas';
+    document.getElementById('edit-featured').checked = false;
+    document.getElementById('edit-agotado').checked = false;
+    document.getElementById('btn-delete-prod').style.display = 'none';
+    setImgPreview('');
+    window._imgFile = null;
+    document.getElementById('product-modal').classList.add('open');
+}
+
+// ── IMAGEN ──
+function setImgPreview(src) {
+    const prev = document.getElementById('modal-img-preview');
+    const ph   = document.getElementById('upload-placeholder');
+    const ov   = document.getElementById('img-change-overlay');
+    if (src) { prev.src=src; prev.style.display='block'; ph.style.display='none'; ov.style.display='flex'; }
+    else     { prev.style.display='none'; ph.style.display='block'; ov.style.display='none'; }
+}
+function handleImgFile(input) {
+    const f = input.files[0]; if (!f) return;
+    if (f.size > 3*1024*1024) { showToast('⚠️ Imagen máximo 3MB'); return; }
+    window._imgFile = f;
+    const r = new FileReader(); r.onload = e => setImgPreview(e.target.result); r.readAsDataURL(f);
+}
+function handleImgDrop(e) {
+    e.preventDefault();
+    document.getElementById('img-upload-zone').style.borderColor='var(--border)';
+    const f = e.dataTransfer.files[0];
+    if (!f||!f.type.startsWith('image/')) { showToast('⚠️ Solo imágenes'); return; }
+    if (f.size > 3*1024*1024) { showToast('⚠️ Imagen máximo 3MB'); return; }
+    window._imgFile = f;
+    const r = new FileReader(); r.onload = e => setImgPreview(e.target.result); r.readAsDataURL(f);
+}
+async function uploadImagen(file) {
+    const ext  = file.name.split('.').pop();
+    const name = `producto_${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from('imagenes').upload(name, file, { upsert:true });
+    if (error) throw error;
+    return sb.storage.from('imagenes').getPublicUrl(name).data.publicUrl;
+}
+
+// ── GUARDAR PRODUCTO ──
+async function saveProduct() {
+    const nombre    = document.getElementById('edit-name').value.trim().toUpperCase();
+    const precio    = parseInt(document.getElementById('edit-price').value);
+    const descripcion = document.getElementById('edit-ing').value.trim();
+    const destacado = document.getElementById('edit-featured').checked;
+    const agotado   = document.getElementById('edit-agotado').checked;
+    const categoria = document.getElementById('edit-categoria').value;
+    const id        = document.getElementById('edit-index').value;
+    if (!nombre||!precio) { showToast('⚠️ Nombre y precio son obligatorios'); return; }
+
+    setBtnLoading('btn-save-prod', true, 'Guardando...');
+    try {
+        let imagen_url = null;
+        if (window._imgFile) {
+            showToast('📤 Subiendo imagen a la nube...');
+            imagen_url = await uploadImagen(window._imgFile);
+        }
+        if (id) {
+            const upd = { nombre, precio, descripcion, destacado, agotado, categoria };
+            if (imagen_url) upd.imagen_url = imagen_url;
+            const { error } = await sb.from('productos').update(upd).eq('id', id);
+            if (error) throw error;
+        } else {
+            const ins = { nombre, precio, descripcion, destacado, agotado, categoria, activo:true, orden:productosCache.length+1 };
+            if (imagen_url) ins.imagen_url = imagen_url;
+            const { error } = await sb.from('productos').insert(ins);
+            if (error) throw error;
+        }
+        closeProductModal();
+        await renderProducts();
+        showToast('✅ Producto guardado');
+    } catch(e) {
+        showToast('❌ Error: ' + e.message);
+    }
+    setBtnLoading('btn-save-prod', false, 'GUARDAR');
+}
+async function deleteProduct() {
+    const id = document.getElementById('edit-index').value;
+    if (!id||!confirm('¿Eliminar este producto?')) return;
+    const { error } = await sb.from('productos').delete().eq('id', id);
+    if (error) { showToast('❌ Error al eliminar'); return; }
+    closeProductModal(); await renderProducts();
+    showToast('🗑️ Producto eliminado');
+}
+function closeProductModal() {
+    document.getElementById('product-modal').classList.remove('open');
+    document.getElementById('edit-img-file').value = '';
+    window._imgFile = null;
+}
+
+// ── PEDIDOS ──
+let pedidosCache = [];
+async function renderOrders() {
+    const el = document.getElementById('orders-list');
+    el.innerHTML = '<p style="color:var(--muted)">Cargando...</p>';
+    const { data, error } = await sb.from('pedidos').select('*').order('created_at',{ascending:false});
+    if (error) { el.innerHTML='<p style="color:var(--red)">Error</p>'; return; }
+    pedidosCache = data||[];
+    if (!pedidosCache.length) { el.innerHTML='<div class="empty-orders"><div class="big">📋</div><p>Aún no hay pedidos registrados.</p></div>'; return; }
+    el.innerHTML = pedidosCache.map(o=>`
+        <div class="order-card">
+            <div class="order-header">
+                <div><span class="order-id">#${o.id}</span>
+                <span class="order-date" style="margin-left:1rem">${new Date(o.created_at).toLocaleString('es-CO')}</span></div>
+                <span class="order-total">${formatCOP(o.total)}</span>
+            </div>
+            <div class="order-items">${(o.items||[]).map(i=>`<span class="order-item-tag">${i.quantity}x ${i.name}</span>`).join('')}</div>
+        </div>`).join('');
+}
+function exportOrders() {
+    if (!pedidosCache.length) { showToast('No hay pedidos para exportar'); return; }
+    let csv = 'ID,Fecha,Productos,Total\n';
+    pedidosCache.forEach(o=>{
+        const items = (o.items||[]).map(i=>`${i.quantity}x ${i.name}`).join(' | ');
+        csv += `${o.id},"${new Date(o.created_at).toLocaleString('es-CO')}","${items}",${o.total}\n`;
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+    a.download = 'pedidos_raices_burger.csv'; a.click();
+    showToast('📥 Exportado correctamente');
+}
+
+// ── CONFIG ──
+function loadConfig() {
+    const c = JSON.parse(localStorage.getItem('rb_config')||'{}');
+    document.getElementById('cfg-name').value    = c.name    || 'RAÍCES BURGER';
+    document.getElementById('cfg-slogan').value  = c.slogan  || 'Las mejores hamburguesas al carbón en Cúcuta';
+    document.getElementById('cfg-whatsapp').value= c.whatsapp|| '573244652909';
+    document.getElementById('cfg-nequi').value   = c.nequi   || '324 4652909';
+    document.getElementById('cfg-titular').value = c.titular || 'STEVEN DIAZ';
+    document.getElementById('cfg-color').value   = c.color   || '#f28b24';
+    document.getElementById('cfg-color-hex').textContent = c.color||'#f28b24';
+    document.getElementById('cfg-logo').value    = c.logo    || 'assets/LOGO.jpeg';
+    document.getElementById('cfg-hero').value    = c.hero    || '';
+    document.getElementById('cfg-wamsg').value   = c.wamsg   || '';
+}
+document.getElementById('cfg-color').addEventListener('input', function(){ document.getElementById('cfg-color-hex').textContent=this.value; });
+function saveConfig() {
+    const c = {
+        name:      document.getElementById('cfg-name').value,
+        slogan:    document.getElementById('cfg-slogan').value,
+        whatsapp:  document.getElementById('cfg-whatsapp').value,
+        nequi:     document.getElementById('cfg-nequi').value,
+        titular:   document.getElementById('cfg-titular').value,
+        color:     document.getElementById('cfg-color').value,
+        logo:      document.getElementById('cfg-logo').value,
+        hero:      document.getElementById('cfg-hero').value,
+        wamsg:     document.getElementById('cfg-wamsg').value,
+    };
+    localStorage.setItem('rb_config', JSON.stringify(c));
+    showToast('✅ Configuración guardada');
+}
+
+// ── CLIENTES ──
+let clientesCache = [];
+async function renderClientes() {
+    const el = document.getElementById('clientes-list');
+    el.innerHTML = '<p style="color:var(--muted)">Cargando...</p>';
+    const { data, error } = await sb.from('clientes').select('*').order('created_at', { ascending: false });
+    if (error) { el.innerHTML = '<p style="color:var(--red)">Error al cargar clientes</p>'; return; }
+    clientesCache = data || [];
+    if (!clientesCache.length) {
+        el.innerHTML = '<div class="empty-orders"><div class="big">👥</div><p>Aún no hay clientes registrados.</p></div>';
+        return;
+    }
+    el.innerHTML = `
+        <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border);">
+                    <th style="text-align:left; padding:0.8rem; color:var(--muted); font-family:var(--font-h); font-weight:400;">NOMBRE</th>
+                    <th style="text-align:left; padding:0.8rem; color:var(--muted); font-family:var(--font-h); font-weight:400;">CELULAR</th>
+                    <th style="text-align:left; padding:0.8rem; color:var(--muted); font-family:var(--font-h); font-weight:400;">DIRECCIÓN</th>
+                    <th style="text-align:left; padding:0.8rem; color:var(--muted); font-family:var(--font-h); font-weight:400;">CORREO</th>
+                    <th style="text-align:left; padding:0.8rem; color:var(--muted); font-family:var(--font-h); font-weight:400;">FECHA</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${clientesCache.map(c => `
+                    <tr style="border-bottom:1px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background='transparent'">
+                        <td style="padding:0.8rem; font-family:var(--font-h);">${c.nombre} ${c.apellido}</td>
+                        <td style="padding:0.8rem;"><a href="https://wa.me/57${c.celular}" target="_blank" style="color:#25D366; text-decoration:none;">📱 ${c.celular}</a></td>
+                        <td style="padding:0.8rem; color:var(--muted);">${c.direccion || '—'}</td>
+                        <td style="padding:0.8rem; color:var(--muted);">${c.correo || '—'}</td>
+                        <td style="padding:0.8rem; color:var(--muted); font-size:0.8rem;">${new Date(c.created_at).toLocaleDateString('es-CO')}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        </div>
+        <p style="color:var(--muted); font-size:0.85rem; margin-top:1rem;">Total: ${clientesCache.length} clientes</p>
+    `;
+}
+
+function exportClientes() {
+    if (!clientesCache.length) { showToast('No hay clientes para exportar'); return; }
+    let csv = 'Nombre,Apellido,Celular,Dirección,Correo,Fecha\n';
+    clientesCache.forEach(c => {
+        csv += `"${c.nombre}","${c.apellido}","${c.celular}","${c.direccion||''}","${c.correo||''}","${new Date(c.created_at).toLocaleDateString('es-CO')}"\n`;
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    a.download = 'clientes_raices_burger.csv';
+    a.click();
+    showToast('📥 Clientes exportados');
+}
+
+// ── INIT ──
+checkSession();
+</script>
+</body>
+</html>
