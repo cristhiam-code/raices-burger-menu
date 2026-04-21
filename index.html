@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         /* ── VARIABLES MODO OSCURO (default) ── */
         :root, [data-theme="dark"] {
@@ -169,17 +170,21 @@
         .agotado-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; }
         .agotado-overlay span { font-family:var(--font-h); color:white; font-size:1.2rem; background:#e74c3c; padding:0.5rem 1.2rem; border-radius:8px; letter-spacing:1px; }
 
-        .card-body { padding:1.2rem; }
-        .card-name { font-family:var(--font-h); font-size:1.2rem; color:var(--text); margin-bottom:0.4rem; }
-        .card-desc { font-size:0.82rem; color:var(--muted); line-height:1.5; margin-bottom:0.3rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .card-body { padding:0.8rem 1.2rem 0; min-height: 20px; }
+        .card-desc { font-size:0.82rem; color:var(--muted); line-height:1.5; margin-bottom:0.8rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
         .card-desc.expanded { display:block; }
-        .btn-ver-mas { background:none; border:none; color:var(--primary); font-size:0.78rem; cursor:pointer; padding:0 0 0.8rem 0; font-family:var(--font-b); display:block; }
+        .btn-ver-mas { background:none; border:none; color:var(--primary); font-size:0.75rem; cursor:pointer; padding:0 0 0.8rem 0; font-family:var(--font-b); display:block; margin-top:-0.3rem; }
+        
+        .card-bottom-banner { background: var(--primary); padding: 1rem 1.2rem; margin-top: auto; border-top: 1px solid rgba(0,0,0,0.1); }
+        .product-card-premium { display:flex; flex-direction:column; }
+        .card-name { font-family:var(--font-h); font-size:1.35rem; color:#fff; text-transform:uppercase; margin-bottom: 0.6rem; text-align: left; line-height:1.1; text-shadow: 1px 1px 3px rgba(0,0,0,0.3); }
+        
         .card-footer { display:flex; align-items:center; justify-content:space-between; }
-        .card-price { font-family:var(--font-h); font-size:1.3rem; color:var(--primary); }
-        .btn-agregar { background:var(--primary); color:white; border:none; border-radius:10px; padding:0.55rem 1.1rem; font-family:var(--font-h); font-size:1rem; cursor:pointer; transition:background 0.2s, transform 0.1s; }
-        .btn-agregar:hover { background:var(--primary-dark); }
-        .btn-agregar:active { transform:scale(0.95); }
-        .btn-agregar:disabled { background:#444; cursor:not-allowed; }
+        .card-price { font-family:var(--font-h); font-size:1.4rem; color:#fff; font-weight: 600; }
+        .btn-agregar { background:rgba(0,0,0,0.25); color:#fff; border:1px solid rgba(255,255,255,0.4); border-radius:10px; padding:0.6rem 1.1rem; font-family:var(--font-h); font-size:1rem; cursor:pointer; transition:all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .btn-agregar:hover { background:rgba(0,0,0,0.6); border-color:#fff; transform: translateY(-2px); }
+        .btn-agregar:active { transform: translateY(0); }
+        .btn-agregar:disabled { background:rgba(0,0,0,0.1); color:rgba(255,255,255,0.4); cursor:not-allowed; border-color:transparent; box-shadow:none; }
 
         /* ── FOOTER ── */
         .footer { background:var(--bg2); border-top:1px solid var(--border); padding:3rem 1.5rem 2rem; margin-top:3rem; }
@@ -218,6 +223,7 @@
         <span class="topbar-brand-name" id="brand-name">RAÍCES BURGER</span>
     </div>
     <div class="topbar-right">
+        <button class="theme-toggle" onclick="generarYDescargarPDF()" style="color:white; background:var(--primary); font-weight:bold; border-color:var(--primary); gap:0.4rem; font-family:var(--font-h); font-size:0.9rem;" id="btn-pdf-download">📄 Descargar PDF</button>
         <div class="status-badge" id="status-badge">
             <span class="status-dot open" id="status-dot"></span>
             <span id="status-text">Cargando...</span>
@@ -225,6 +231,9 @@
         <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙</button>
     </div>
 </header>
+
+<!-- PDF RENDER CONTAINER (oculto) -->
+<div id="pdf-render-container" style="display:none; position:absolute; left:-9999px;"></div>
 
 <!-- SLIDER -->
 <div class="slider" id="slider"></div>
@@ -478,9 +487,11 @@ async function cargarProductos() {
                                 ${p.agotado ? '<span class="card-badge agotado-badge">Agotado</span>' : ''}
                             </div>
                             <div class="card-body">
-                                <div class="card-name">${p.nombre}</div>
                                 <div class="card-desc" id="desc-${p.id}">${p.descripcion||''}</div>
                                 ${p.descripcion && p.descripcion.length > 60 ? `<button class="btn-ver-mas" onclick="toggleDesc('desc-${p.id}', this)">Ver más ▾</button>` : ''}
+                            </div>
+                            <div class="card-bottom-banner">
+                                <div class="card-name">${p.nombre}</div>
                                 <div class="card-footer">
                                     <span class="card-price">${formatCOP(p.precio)}</span>
                                     <button class="btn-agregar" onclick="addToCart('${p.nombre.replace(/'/g,"\\'")}', ${p.precio})" ${p.agotado?'disabled':''}>
@@ -508,6 +519,88 @@ function toggleDesc(id, btn) {
         btn.textContent = 'Ver menos ▴';
     }
 }
+
+window.generarYDescargarPDF = async function() {
+    const btn = document.getElementById('btn-pdf-download');
+    btn.innerHTML = '⏳ Generando...';
+    btn.disabled = true;
+
+    try {
+        const { data, error } = await sbMenu.from('productos').select('*').eq('activo', true).order('orden');
+        if (error || !data || !data.length) {
+            alert('No se pudo cargar el menú para el PDF.');
+            return;
+        }
+
+        const container = document.getElementById('pdf-render-container');
+        container.style.display = 'block';
+
+        let html = `
+            <div style="font-family: 'Poppins', sans-serif; padding: 40px; background: #fff; color: #111; width: 800px;">
+                <div style="text-align: center; border-bottom: 4px solid var(--primary); padding-bottom: 20px; margin-bottom: 30px;">
+                    <img src="assets/LOGO.jpeg" style="height: 100px; border-radius: 12px; margin-bottom: 10px;" onerror="this.style.display='none'">
+                    <h1 style="font-family: 'Oswald', sans-serif; font-size: 3rem; color: var(--primary); margin:0;">RAÍCES BURGER</h1>
+                    <p style="color: #666; font-size: 1.1rem; margin:0;">Las mejores hamburguesas al carbón</p>
+                </div>
+        `;
+
+        CATEGORIAS.forEach(cat => {
+            const prods = data.filter(p => (p.categoria || 'Hamburguesas') === cat.key);
+            if (!prods.length) return;
+
+            html += `
+                <div style="margin-bottom: 40px;">
+                    <h2 style="font-family: 'Oswald', sans-serif; font-size: 2rem; color: #111; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">
+                        ${cat.key.toUpperCase()}
+                    </h2>
+                    <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+            `;
+
+            prods.forEach(p => {
+                html += `
+                    <div style="width: calc(50% - 10px); background: #f9f9f9; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; display: flex;">
+                        ${p.imagen_url ? `<img src="${p.imagen_url}" style="width: 120px; height: 120px; object-fit: cover;">` : ''}
+                        <div style="padding: 15px; flex: 1;">
+                            <h3 style="font-family: 'Oswald', sans-serif; font-size: 1.3rem; margin: 0 0 5px 0; color: #111;">${p.nombre}</h3>
+                            <p style="font-size: 0.85rem; color: #666; margin: 0 0 10px 0; line-height: 1.4;">${p.descripcion || ''}</p>
+                            <span style="font-family: 'Oswald', sans-serif; font-size: 1.2rem; color: var(--primary);">${formatCOP(p.precio)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div></div>`;
+        });
+
+        html += `
+                <div style="text-align: center; margin-top: 40px; padding-top: 30px; border-top: 2px solid #eee;">
+                    <p style="font-size: 1.1rem; font-weight: bold; margin-bottom: 10px;">¡Haz tu pedido por WhatsApp!</p>
+                    <p style="font-family: 'Oswald', sans-serif; font-size: 1.5rem; color: #25D366; margin:0;">📱 324 465 2909</p>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+
+        const opt = {
+            margin:       [10, 0, 10, 0],
+            filename:     'Menu_Raices_Burger.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        await html2pdf().set(opt).from(container.firstElementChild).save();
+    } catch (e) {
+        console.error(e);
+        alert('Hubo un error al generar el PDF.');
+    } finally {
+        document.getElementById('pdf-render-container').style.display = 'none';
+        btn.innerHTML = '📄 Descargar PDF';
+        btn.disabled = false;
+    }
+}
+
 
 cargarTema();
 aplicarConfig();
