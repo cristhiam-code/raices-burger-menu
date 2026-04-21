@@ -2,7 +2,7 @@
 
 > Menú digital profesional para restaurantes con panel de administración, pedidos por WhatsApp y base de datos en la nube.
 
-**🌐 Demo en vivo:** [menu-raices-burger.netlify.app](https://menu-raices-burger.netlify.app)
+**🌐 Demostración en vivo:** [raices-burger.netlify.app](https://raices-burger.netlify.app/)
 
 ---
 
